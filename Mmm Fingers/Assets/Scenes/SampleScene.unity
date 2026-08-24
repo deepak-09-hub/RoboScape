@@ -2521,7 +2521,7 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 64
   fallbackCastRadius: 0.2
-  touchOffset: {x: 0, y: -0.2}
+  touchOffset: {x: 0, y: 0}
   clampInsideCamera: 1
   cameraEdgePadding: 0.1
   loseWhenFingerReleased: 1

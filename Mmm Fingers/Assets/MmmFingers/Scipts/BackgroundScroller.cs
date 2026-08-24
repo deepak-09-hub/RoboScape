@@ -2,9 +2,19 @@ using UnityEngine;
 
 public class BackgroundScroller : MonoBehaviour
 {
-    [Header("References")]
+    [Header("Background")]
     [SerializeField] private Transform backgroundA;
     [SerializeField] private Transform backgroundB;
+
+    [Header("Left Border")]
+    [SerializeField] private Transform leftBorderA;
+    [SerializeField] private Transform leftBorderB;
+
+    [Header("Right Border")]
+    [SerializeField] private Transform rightBorderA;
+    [SerializeField] private Transform rightBorderB;
+
+    [Header("References")]
     [SerializeField] private GameSpeedController speedController;
     [SerializeField] private Camera worldCamera;
 
@@ -12,9 +22,17 @@ public class BackgroundScroller : MonoBehaviour
     [SerializeField] private float speedMultiplier = 1f;
 
     private float backgroundHeight;
+    private float leftBorderHeight;
+    private float rightBorderHeight;
 
-    private Vector3 startPositionA;
-    private Vector3 startPositionB;
+    private Vector3 backgroundAStart;
+    private Vector3 backgroundBStart;
+
+    private Vector3 leftBorderAStart;
+    private Vector3 leftBorderBStart;
+
+    private Vector3 rightBorderAStart;
+    private Vector3 rightBorderBStart;
 
     private void Awake()
     {
@@ -23,22 +41,20 @@ public class BackgroundScroller : MonoBehaviour
             worldCamera = Camera.main;
         }
 
-        startPositionA = backgroundA.position;
-        startPositionB = backgroundB.position;
+        // Save starting positions
+        backgroundAStart = backgroundA.position;
+        backgroundBStart = backgroundB.position;
 
-        SpriteRenderer renderer =
-            backgroundA.GetComponent<SpriteRenderer>();
+        leftBorderAStart = leftBorderA.position;
+        leftBorderBStart = leftBorderB.position;
 
-        if (renderer == null)
-        {
-            renderer =
-                backgroundA.GetComponentInChildren<SpriteRenderer>();
-        }
+        rightBorderAStart = rightBorderA.position;
+        rightBorderBStart = rightBorderB.position;
 
-        if (renderer != null)
-        {
-            backgroundHeight = renderer.bounds.size.y;
-        }
+        // Get individual tile heights
+        backgroundHeight = GetSpriteHeight(backgroundA);
+        leftBorderHeight = GetSpriteHeight(leftBorderA);
+        rightBorderHeight = GetSpriteHeight(rightBorderA);
     }
 
     private void Update()
@@ -63,24 +79,88 @@ public class BackgroundScroller : MonoBehaviour
             speed *
             Time.deltaTime;
 
-        backgroundA.position += movement;
-        backgroundB.position += movement;
+        // Background
+        Move(backgroundA, movement);
+        Move(backgroundB, movement);
 
-        CheckAndRecycle(backgroundA, backgroundB);
-        CheckAndRecycle(backgroundB, backgroundA);
+        // Left border
+        Move(leftBorderA, movement);
+        Move(leftBorderB, movement);
+
+        // Right border
+        Move(rightBorderA, movement);
+        Move(rightBorderB, movement);
+
+        // Recycle background
+        CheckAndRecycle(
+            backgroundA,
+            backgroundB,
+            backgroundHeight
+        );
+
+        CheckAndRecycle(
+            backgroundB,
+            backgroundA,
+            backgroundHeight
+        );
+
+        // Recycle left border
+        CheckAndRecycle(
+            leftBorderA,
+            leftBorderB,
+            leftBorderHeight
+        );
+
+        CheckAndRecycle(
+            leftBorderB,
+            leftBorderA,
+            leftBorderHeight
+        );
+
+        // Recycle right border
+        CheckAndRecycle(
+            rightBorderA,
+            rightBorderB,
+            rightBorderHeight
+        );
+
+        CheckAndRecycle(
+            rightBorderB,
+            rightBorderA,
+            rightBorderHeight
+        );
+    }
+
+    private void Move(
+        Transform target,
+        Vector3 movement)
+    {
+        if (target == null)
+        {
+            return;
+        }
+
+        target.position += movement;
     }
 
     private void CheckAndRecycle(
-        Transform background,
-        Transform otherBackground)
+        Transform tile,
+        Transform otherTile,
+        float tileHeight)
     {
+        if (tile == null ||
+            otherTile == null)
+        {
+            return;
+        }
+
         SpriteRenderer renderer =
-            background.GetComponent<SpriteRenderer>();
+            tile.GetComponent<SpriteRenderer>();
 
         if (renderer == null)
         {
             renderer =
-                background.GetComponentInChildren<SpriteRenderer>();
+                tile.GetComponentInChildren<SpriteRenderer>();
         }
 
         if (renderer == null)
@@ -89,7 +169,9 @@ public class BackgroundScroller : MonoBehaviour
         }
 
         float cameraDistance =
-            Mathf.Abs(worldCamera.transform.position.z);
+            Mathf.Abs(
+                worldCamera.transform.position.z
+            );
 
         float cameraBottom =
             worldCamera.ViewportToWorldPoint(
@@ -100,22 +182,58 @@ public class BackgroundScroller : MonoBehaviour
                 )
             ).y;
 
-        // Background has completely passed below the screen.
+        // Completely below the screen
         if (renderer.bounds.max.y < cameraBottom)
         {
-            background.position =
+            tile.position =
                 new Vector3(
-                    background.position.x,
-                    otherBackground.position.y +
-                    backgroundHeight,
-                    background.position.z
+                    tile.position.x,
+                    otherTile.position.y +
+                    tileHeight,
+                    tile.position.z
                 );
         }
     }
 
+    private float GetSpriteHeight(
+        Transform target)
+    {
+        if (target == null)
+        {
+            return 0f;
+        }
+
+        SpriteRenderer renderer =
+            target.GetComponent<SpriteRenderer>();
+
+        if (renderer == null)
+        {
+            renderer =
+                target.GetComponentInChildren<SpriteRenderer>();
+        }
+
+        if (renderer == null)
+        {
+            Debug.LogWarning(
+                target.name +
+                " has no SpriteRenderer."
+            );
+
+            return 0f;
+        }
+
+        return renderer.bounds.size.y;
+    }
+
     public void ResetBackground()
     {
-        backgroundA.position = startPositionA;
-        backgroundB.position = startPositionB;
+        backgroundA.position = backgroundAStart;
+        backgroundB.position = backgroundBStart;
+
+        leftBorderA.position = leftBorderAStart;
+        leftBorderB.position = leftBorderBStart;
+
+        rightBorderA.position = rightBorderAStart;
+        rightBorderB.position = rightBorderBStart;
     }
 }

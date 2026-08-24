@@ -1,4 +1,3 @@
-using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -28,6 +27,13 @@ public class FingerController : MonoBehaviour
 
     [Header("Rules")]
     [SerializeField] private bool loseWhenFingerReleased = true;
+
+    [Header("Hold To Start")]
+    [SerializeField] private float holdDuration = 0.2f;
+
+    private bool waitingForHold;
+    private float holdTimer;
+    private Vector2 latestHoldPosition;
 
     private Rigidbody2D body;
 
@@ -96,15 +102,32 @@ public class FingerController : MonoBehaviour
             Vector2 screenPosition =
                 Input.mousePosition;
 
-            if (!IsPointerOverBlockingUI(
-                    screenPosition))
+            if (!IsPointerOverBlockingUI(screenPosition))
             {
-                BeginFingerPress(
-                    screenPosition, 0.15f
+                StartPendingHold(
+                    screenPosition,
+                    -1
                 );
             }
         }
 
+        // Waiting for the required hold time
+        if (waitingForHold)
+        {
+            if (Input.GetMouseButton(0))
+            {
+                UpdatePendingHold(
+                    Input.mousePosition
+                );
+            }
+            else
+            {
+                // Released too early
+                CancelPendingHold();
+            }
+        }
+
+        // Normal gameplay movement
         if (fingerPressed &&
             Input.GetMouseButton(0))
         {
@@ -126,8 +149,48 @@ public class FingerController : MonoBehaviour
 
     private void HandleTouchInput()
     {
+        // ------------------------------------------
+        // BEFORE GAME/FINGER HAS STARTED
+        // ------------------------------------------
+
         if (!fingerPressed)
         {
+            // Look for a new finger press.
+            if (!waitingForHold)
+            {
+                for (int i = 0;
+                     i < Input.touchCount;
+                     i++)
+                {
+                    Touch touch =
+                        Input.GetTouch(i);
+
+                    if (touch.phase !=
+                        TouchPhase.Began)
+                    {
+                        continue;
+                    }
+
+                    if (IsPointerOverBlockingUI(
+                            touch.position,
+                            touch.fingerId))
+                    {
+                        continue;
+                    }
+
+                    StartPendingHold(
+                        touch.position,
+                        touch.fingerId
+                    );
+
+                    return;
+                }
+
+                return;
+            }
+
+            // We already have a finger that
+            // we're waiting to see held long enough.
             for (int i = 0;
                  i < Input.touchCount;
                  i++)
@@ -135,31 +198,39 @@ public class FingerController : MonoBehaviour
                 Touch touch =
                     Input.GetTouch(i);
 
-                if (touch.phase !=
-                    TouchPhase.Began)
+                if (touch.fingerId != activeFingerId)
                 {
                     continue;
                 }
 
-                if (IsPointerOverBlockingUI(
-                        touch.position,
-                        touch.fingerId))
+                if (touch.phase ==
+                        TouchPhase.Ended ||
+                    touch.phase ==
+                        TouchPhase.Canceled)
                 {
-                    continue;
+                    CancelPendingHold();
+                    return;
                 }
 
-                activeFingerId =
-                    touch.fingerId;
+                latestHoldPosition =
+                    touch.position;
 
-                BeginFingerPress(
-                    touch.position, 0.15f
+                UpdatePendingHold(
+                    touch.position
                 );
 
                 return;
             }
 
+            // Finger vanished before hold finished.
+            CancelPendingHold();
+
             return;
         }
+
+        // ------------------------------------------
+        // NORMAL GAMEPLAY
+        // ------------------------------------------
 
         for (int i = 0;
              i < Input.touchCount;
@@ -168,8 +239,7 @@ public class FingerController : MonoBehaviour
             Touch touch =
                 Input.GetTouch(i);
 
-            if (touch.fingerId !=
-                activeFingerId)
+            if (touch.fingerId != activeFingerId)
             {
                 continue;
             }
@@ -202,24 +272,58 @@ public class FingerController : MonoBehaviour
     // BEGIN
     // ==================================================
 
-    private void BeginFingerPress(Vector2 screenPosition, float delay)
+    private void StartPendingHold(
+    Vector2 screenPosition,
+    int fingerId)
     {
-        StartCoroutine(BeginFingerPressRoutine(
-            screenPosition,
-            delay
-        ));
+        waitingForHold = true;
+        holdTimer = 0f;
+
+        latestHoldPosition =
+            screenPosition;
+
+        activeFingerId =
+            fingerId;
     }
 
-    private IEnumerator BeginFingerPressRoutine(
-        Vector2 screenPosition, float delay)
+    private void UpdatePendingHold(
+        Vector2 currentScreenPosition)
     {
-        yield return new WaitForSeconds(delay);
+        latestHoldPosition =
+            currentScreenPosition;
+
+        holdTimer += Time.deltaTime;
+
+        if (holdTimer < holdDuration)
+        {
+            return;
+        }
+
+        waitingForHold = false;
+        holdTimer = 0f;
+
+        BeginFingerPress(
+            latestHoldPosition
+        );
+    }
+
+    private void CancelPendingHold()
+    {
+        waitingForHold = false;
+        holdTimer = 0f;
+        activeFingerId = -1;
+    }
+
+    private void BeginFingerPress(
+    Vector2 screenPosition)
+    {
         if (GameManager.Instance.CurrentState !=
                 GameManager.GameState.Waiting &&
             GameManager.Instance.CurrentState !=
                 GameManager.GameState.Playing)
         {
-           yield return null;
+            CancelPendingHold();
+            return;
         }
 
         Vector2 worldPosition =
@@ -234,16 +338,12 @@ public class FingerController : MonoBehaviour
 
         SetFingerVisible(true);
 
-        // The SAME touch that places the finger
-        // also starts the game.
         if (GameManager.Instance.CurrentState ==
             GameManager.GameState.Waiting)
         {
             GameManager.Instance.StartRun();
         }
 
-        // Player may have placed the finger
-        // directly onto an obstacle.
         if (HitsObstacle(
                 worldPosition,
                 worldPosition))
@@ -531,7 +631,8 @@ public class FingerController : MonoBehaviour
     public void DisableFinger()
     {
         fingerPressed = false;
-        activeFingerId = -1;
+
+        CancelPendingHold();
 
         SetFingerVisible(false);
     }

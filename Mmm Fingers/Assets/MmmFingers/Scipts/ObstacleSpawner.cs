@@ -16,12 +16,10 @@ public class ObstacleSpawner : MonoBehaviour
 
     [Header("Spawn Timing")]
     [SerializeField] private float firstSpawnDelay = 0.8f;
-    [SerializeField]
-    private Vector2 spawnIntervalRange =
-        new Vector2(1.2f, 1.8f);
 
     [Header("Difficulty")]
     [SerializeField] private GameSpeedController speedController;
+    [SerializeField] private ObstacleDensityController densityController;
 
     private Coroutine spawnRoutine;
 
@@ -61,32 +59,60 @@ public class ObstacleSpawner : MonoBehaviour
 
     private IEnumerator SpawnRoutine()
     {
+        if (densityController != null)
+        {
+            densityController.ResetDensity();
+        }
+
+        // Small delay before the very first obstacle.
         if (firstSpawnDelay > 0f)
         {
-            yield return new WaitForSeconds(firstSpawnDelay);
+            yield return new WaitForSeconds(
+                firstSpawnDelay
+            );
         }
+
+        if (GameManager.Instance == null ||
+            !GameManager.Instance.IsPlaying)
+        {
+            spawnRoutine = null;
+            yield break;
+        }
+
+        // First obstacle after initial delay.
+        SpawnObstacle();
+
+        float distanceSinceLastSpawn = 0f;
 
         while (GameManager.Instance != null &&
                GameManager.Instance.IsPlaying)
         {
-            SpawnObstacle();
+            if (speedController == null ||
+                densityController == null)
+            {
+                yield return null;
+                continue;
+            }
 
-            float minimumInterval = Mathf.Min(
-                spawnIntervalRange.x,
-                spawnIntervalRange.y
-            );
+            // How far the world travelled this frame.
+            float distanceThisFrame =
+                speedController.CurrentSpeed *
+                Time.deltaTime;
 
-            float maximumInterval = Mathf.Max(
-                spawnIntervalRange.x,
-                spawnIntervalRange.y
-            );
+            distanceSinceLastSpawn +=
+                distanceThisFrame;
 
-            float delay = Random.Range(
-                minimumInterval,
-                maximumInterval
-            );
+            // Spawn once enough WORLD DISTANCE
+            // has passed.
+            if (distanceSinceLastSpawn >=
+                densityController.CurrentSpacing)
+            {
+                SpawnObstacle();
 
-            yield return new WaitForSeconds(delay);
+                distanceSinceLastSpawn = 0f;
+            }
+
+            yield return null;
         }
 
         spawnRoutine = null;

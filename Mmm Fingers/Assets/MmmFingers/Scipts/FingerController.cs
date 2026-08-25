@@ -57,6 +57,12 @@ public class FingerController : MonoBehaviour
             fingerCollider = GetComponent<Collider2D>();
         }
 
+        // The finger must follow the touch directly.
+        body.interpolation = RigidbodyInterpolation2D.None;
+        body.gravityScale = 0f;
+        body.velocity = Vector2.zero;
+        body.angularVelocity = 0f;
+
         DisableFinger();
     }
 
@@ -356,32 +362,54 @@ public class FingerController : MonoBehaviour
     // MOVE
     // ==================================================
 
-    private void MoveFinger(
-        Vector2 screenPosition)
+    //private void MoveFinger(
+    //    Vector2 screenPosition)
+    //{
+    //    if (!fingerPressed)
+    //    {
+    //        return;
+    //    }
+
+    //    Vector2 currentPosition =
+    //        body.position;
+
+    //    Vector2 targetPosition =
+    //        ScreenToWorldPosition(
+    //            screenPosition
+    //        );
+
+    //    if (GameManager.Instance.IsPlaying &&
+    //        HitsObstacle(
+    //            currentPosition,
+    //            targetPosition))
+    //    {
+    //        LoseGame();
+    //        return;
+    //    }
+
+    //    // Move the Rigidbody directly.
+    //    // Do NOT move transform.position separately.
+    //    body.position = targetPosition;
+    //}
+
+    private void MoveFinger(Vector2 screenPosition)
     {
         if (!fingerPressed)
         {
             return;
         }
 
-        Vector2 currentPosition =
-            body.position;
-
         Vector2 targetPosition =
-            ScreenToWorldPosition(
-                screenPosition
-            );
+            ScreenToWorldPosition(screenPosition);
 
-        if (GameManager.Instance.IsPlaying &&
-            HitsObstacle(
-                currentPosition,
-                targetPosition))
-        {
-            LoseGame();
-            return;
-        }
-
-        transform.position = targetPosition;
+        transform.SetPositionAndRotation(
+            new Vector3(
+                targetPosition.x,
+                targetPosition.y,
+                transform.position.z
+            ),
+            transform.rotation
+        );
     }
 
 

@@ -384,6 +384,7 @@ public class FingerController : MonoBehaviour
         transform.position = targetPosition;
     }
 
+
     // ==================================================
     // RELEASE
     // ==================================================
